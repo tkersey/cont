@@ -7,20 +7,30 @@ public struct Cont<R, A> {
     }
 }
 
-extension Cont {
-    public static func pure (a: A) -> Self {
-        .init { k in k(a) }
-    }
+public func run<R>(_ a: Cont<R, R>) -> R {
+    a.run { $0 }
 }
 
-public func bind<R, A, B>(c: Cont<R, A>, f: @escaping (A) -> Cont<R, B>) -> Cont<R, B> {
-    .init { k in c.run { a in f(a).run(k) } }
+public func pure<R, A>(_ a: A) -> Cont<R, A> {
+    .init { $0(a) }
 }
 
-public func fmap<R, A, B>(c: Cont<R, A>, f: @escaping (A) -> B) -> Cont<R, B> {
-    .init { k in c.run { a in k(f(a)) } }
+public func bind<R, A, B>(_ c: Cont<R, A>, f: @escaping (A) -> Cont<R, B>) -> Cont<R, B> {
+    .init { k in c.run { f($0).run(k) } }
+}
+
+public func fmap<R, A, B>(_ c: Cont<R, A>, f: @escaping (A) -> B) -> Cont<R, B> {
+    .init { k in c.run { k(f($0)) } }
 }
 
 public func callCC<R, A, B>(_ f: @escaping (@escaping (A) -> Cont<R, B>) -> Cont<R, A>) -> Cont<R, A> {
-    .init { k in f { a in Cont { _ in k(a) } }.run(k) }
+    .init { k in f { a in .init { _ in k(a) } }.run(k) }
+}
+
+public func reset<R, S>(_ a: Cont<R, R>) -> Cont<S, R> {
+    pure(run(a))
+}
+
+public func shift<R, S, A>(_ f : @escaping ((A) -> Cont<S, R>) -> Cont<R, R>) -> Cont<R, A> {
+    .init { k in run(f { pure(k($0)) }) }
 }
